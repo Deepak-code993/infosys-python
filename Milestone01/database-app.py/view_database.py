@@ -1,10 +1,18 @@
 import sqlite3
 from pathlib import Path
 
-db_path = Path(__file__).parent / "student.db"
-conn = sqlite3.connect(db_path)
+DB_PATH = Path(__file__).resolve().parent / 'students.db'
+conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
-cur.execute("SELECT * FROM students")
+cur.execute(
+    '''CREATE TABLE IF NOT EXISTS students(
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            age INTEGER,
+            course TEXT)
+'''
+)
+cur.execute('SELECT * FROM students')
 rows = cur.fetchall()
 for row in rows:
     print(row)
