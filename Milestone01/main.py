@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from file_handler import read_and_split_file
-from rule_engine import process_chunk
+from Milestone01.file_handler import read_and_split_file
+from Milestone01.rule_engine import process_chunk
 from database import setup_database, insert_result
 
 PROJECT_ROOT = Path(__file__).resolve().parent
