@@ -1,1 +1,1 @@
-This project is a modular Python-based text processing system that reads large text files, splits them into fixed-size chunks, applies rule-based analysis on each chunk, and stores the structured results in a SQLite database. The system is designed to demonstrate file handling, chunk-based data processing, rule engine implementation, and database integration using a clean and maintainable architecture. It can be extended further for large-scale log analysis, error monitoring, or automated text classification tasks.
+
