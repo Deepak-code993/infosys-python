@@ -1,4 +1,3 @@
-
 # Parallel Text Chunk Analyzer (Python + SQLite)
 
 This project processes a large text file in chunks, analyzes each chunk using a simple rule engine, and stores the results in a SQLite database.

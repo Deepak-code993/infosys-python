@@ -1,0 +1,12 @@
+chunk_number,word_count,error_count,trust_level,frequency_label,harsh_words_found,severity_score
+1,2487,0,Trustable,Saturated,"murder(58), suicide(43), homicide(58), genocide(43), assassination(29), abuse(70), molestation(42)",10
+2,2484,0,Trustable,Saturated,"murder(57), suicide(43), homicide(57), genocide(43), assassination(29), abuse(73), molestation(44)",10
+3,2490,0,Trustable,Saturated,"murder(57), suicide(43), homicide(57), genocide(43), assassination(28), abuse(71), molestation(43)",10
+4,2484,0,Trustable,Saturated,"murder(58), suicide(43), homicide(56), genocide(42), assassination(28), abuse(71), molestation(42)",10
+5,2481,0,Trustable,Saturated,"murder(56), suicide(42), homicide(58), genocide(44), assassination(29), abuse(72), molestation(44)",10
+6,2490,0,Trustable,Saturated,"murder(58), suicide(44), homicide(58), genocide(43), assassination(29), abuse(72), molestation(43)",10
+7,2484,0,Trustable,Saturated,"murder(56), suicide(42), homicide(56), genocide(42), assassination(28), abuse(71), molestation(42)",10
+8,2487,0,Trustable,Saturated,"murder(58), suicide(43), homicide(58), genocide(43), assassination(29), abuse(70), molestation(42)",10
+9,2484,0,Trustable,Saturated,"murder(57), suicide(43), homicide(57), genocide(43), assassination(29), abuse(73), molestation(44)",10
+10,2490,0,Trustable,Saturated,"murder(57), suicide(43), homicide(57), genocide(43), assassination(28), abuse(71), molestation(43)",10
+11,1935,0,Trustable,Saturated,"murder(44), suicide(33), homicide(44), genocide(33), assassination(22), abuse(56), molestation(33)",10

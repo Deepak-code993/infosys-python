@@ -1,0 +1,8 @@
+chunk_number,word_count,error_count,trust_level,frequency_label,harsh_words_found,severity_score
+1,901,0,Trustable,No usage,None,0
+2,900,0,Trustable,No usage,None,0
+3,901,2,Moderately Trustable,No usage,None,0
+4,902,4,Moderately Trustable,No usage,None,0
+5,902,10,Not Trustable,No usage,None,0
+6,902,20,Not Trustable,No usage,None,0
+7,546,10,Not Trustable,No usage,None,0
