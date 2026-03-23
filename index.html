@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>HarshScan — Content Analysis Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=Unbounded:wght@400;600;700;900&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#07070d;--panel:#0e0e18;--panel2:#13131f;--border:#1c1c2e;--border2:#282840;
+  --red:#ff3b5c;--orange:#ff7b39;--yellow:#f5c842;--green:#2edb85;--blue:#4d9fff;--purple:#9f6fff;
+  --text:#d0d0f0;--dim:#555570;--mono:'IBM Plex Mono',monospace;--head:'Unbounded',sans-serif;
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;overflow-x:hidden;}
+
+/* scanlines */
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,255,255,.008) 3px,rgba(255,255,255,.008) 4px);pointer-events:none;z-index:9999;}
+
+/* ── HEADER ── */
+header{
+  position:sticky;top:0;z-index:200;
+  background:rgba(7,7,13,.92);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;
+}
+.logo{font-family:var(--head);font-size:.95rem;font-weight:900;letter-spacing:.06em;display:flex;align-items:center;gap:10px;}
+.logo-hex{width:28px;height:28px;background:var(--red);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);animation:hpulse 3s ease-in-out infinite;}
+@keyframes hpulse{0%,100%{opacity:1}50%{opacity:.7;box-shadow:0 0 20px rgba(255,59,92,.5);}}
+.logo span{color:var(--red);}
+.header-r{display:flex;align-items:center;gap:20px;font-size:.75rem;color:var(--dim);letter-spacing:.12em;}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:blink 2s ease-in-out infinite;display:inline-block;margin-right:5px;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3;}}
+
+/* ── MAIN ── */
+.wrap{max-width:1280px;margin:0 auto;padding:40px 32px 80px;}
+
+/* ── SECTION LABEL ── */
+.slabel{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-bottom:14px;display:flex;align-items:center;gap:10px;}
+.slabel::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* ── UPLOAD ZONE ── */
+.upload-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:36px 32px;margin-bottom:36px;animation:fadeUp .5s ease both;
+}
+.upload-row{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;}
+.drop-zone{
+  border:1.5px dashed var(--border2);border-radius:var(--radius);
+  background:var(--panel2);padding:40px 24px;text-align:center;cursor:pointer;
+  transition:all .2s;position:relative;overflow:hidden;min-height:160px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+}
+.drop-zone::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(255,59,92,.05) 0%,transparent 70%);opacity:0;transition:opacity .3s;}
+.drop-zone:hover,.drop-zone.over{border-color:var(--red);background:rgba(255,59,92,.03);}
+.drop-zone:hover::before,.drop-zone.over::before{opacity:1;}
+.drop-zone.over{box-shadow:0 0 40px rgba(255,59,92,.1);}
+.drop-icon-wrap{width:52px;height:52px;border:1px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.drop-zone:hover .drop-icon-wrap{border-color:var(--red);background:rgba(255,59,92,.08);}
+.drop-title{font-family:var(--head);font-weight:700;font-size:.85rem;color:#fff;}
+.drop-sub{font-size:.78rem;color:var(--dim);line-height:1.7;}
+.drop-sub b{color:var(--red);cursor:pointer;}
+.drop-sub b:hover{text-decoration:underline;}
+#fileInput{display:none;}
+
+/* file list */
+.file-list{display:flex;flex-direction:column;gap:6px;margin-top:14px;width:100%;}
+.file-item{
+  display:flex;align-items:center;gap:8px;padding:7px 12px;
+  background:rgba(46,219,133,.06);border:1px solid rgba(46,219,133,.18);
+  border-radius:4px;font-size:.8rem;color:var(--green);
+}
+.file-item .fi-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.file-item .fi-size{color:var(--dim);flex-shrink:0;}
+.fi-remove{background:none;border:none;color:var(--dim);cursor:pointer;font-size:.85rem;line-height:1;padding:0 2px;transition:color .15s;}
+.fi-remove:hover{color:var(--red);}
+
+/* right panel — upload info */
+.upload-info{display:flex;flex-direction:column;gap:12px;min-width:200px;}
+.info-box{background:var(--panel2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.info-box-label{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:6px;}
+.info-box-val{font-family:var(--head);font-size:1.5rem;font-weight:700;color:#fff;}
+.info-box-sub{font-size:.72rem;color:var(--dim);margin-top:3px;}
+
+/* analyze button */
+.btn-analyze{
+  width:100%;padding:14px;
+  background:var(--red);border:none;border-radius:4px;
+  font-family:var(--head);font-weight:700;font-size:.8rem;letter-spacing:.06em;
+  color:#fff;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  margin-top:4px;
+}
+.btn-analyze:hover:not(:disabled){background:#ff5470;transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,59,92,.3);}
+.btn-analyze:disabled{opacity:.35;cursor:not-allowed;}
+.btn-spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;}
+.btn-analyze.loading .btn-spinner{display:block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.btn-reset{
+  width:100%;padding:10px;background:transparent;border:1px solid var(--border2);
+  border-radius:4px;font-family:var(--mono);font-size:.7rem;color:var(--dim);
+  cursor:pointer;transition:all .2s;letter-spacing:.06em;
+}
+.btn-reset:hover{border-color:var(--red);color:var(--red);}
+
+.error-box{
+  display:none;background:rgba(255,59,92,.07);border:1px solid rgba(255,59,92,.25);
+  border-radius:4px;padding:10px 14px;font-size:.72rem;color:var(--red);margin-top:12px;
+}
+.error-box.show{display:block;}
+
+/* ── DASHBOARD ── */
+#dashboard{display:none;}
+#dashboard.show{display:block;animation:fadeUp .4s ease both;}
+
+/* summary stats */
+.stats-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:28px;}
+.stat-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 16px;position:relative;overflow:hidden;
+}
+.stat-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;}
+.stat-card:nth-child(1)::after{background:var(--blue);}
+.stat-card:nth-child(2)::after{background:var(--purple);}
+.stat-card:nth-child(3)::after{background:var(--green);}
+.stat-card:nth-child(4)::after{background:var(--red);}
+.stat-card:nth-child(5)::after{background:var(--yellow);}
+.stat-card:nth-child(6)::after{background:var(--orange);}
+.sc-label{font-size:.7rem;letter-spacing:.15em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;}
+.sc-val{font-family:var(--head);font-size:1.6rem;font-weight:700;color:#fff;line-height:1;}
+.sc-sub{font-size:.72rem;color:var(--dim);margin-top:4px;}
+
+/* ── CHARTS ROW ── */
+.charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:28px;}
+.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.chart-title{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-bottom:16px;}
+.chart-wrap{position:relative;height:200px;}
+
+/* ── PARALLEL TIMING ── */
+.timing-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px 28px;margin-bottom:28px;
+}
+.timing-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin:16px 0;}
+.timing-item{text-align:center;}
+.ti-label{font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);margin-bottom:8px;}
+.ti-val{font-family:var(--head);font-size:1.3rem;font-weight:700;color:#fff;}
+.ti-unit{font-size:.72rem;color:var(--dim);margin-top:2px;}
+.timing-bar-row{display:grid;grid-template-columns:80px 1fr 70px;align-items:center;gap:12px;margin:6px 0;font-size:.78rem;}
+.timing-bar-row .tlabel{color:var(--dim);text-align:right;}
+.timing-bar-outer{background:var(--border);border-radius:2px;height:8px;overflow:hidden;}
+.timing-bar-fill{height:100%;border-radius:2px;transition:width 1s cubic-bezier(.25,.46,.45,.94);}
+.timing-note{font-size:.75rem;color:var(--dim);line-height:1.7;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;}
+.timing-note strong{color:var(--yellow);}
+
+/* ── FILE STATS TABLE ── */
+.file-stats-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:28px;}
+.fs-table{width:100%;border-collapse:collapse;font-size:.82rem;}
+.fs-table th{text-align:left;padding:8px 12px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);}
+.fs-table td{padding:9px 12px;border-bottom:1px solid var(--border);}
+.fs-table tr:last-child td{border-bottom:none;}
+.fs-table tr:hover td{background:rgba(255,255,255,.02);}
+
+/* ── SEARCH BAR ── */
+.search-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:28px;}
+.search-row{display:flex;gap:10px;align-items:center;}
+.search-input{
+  flex:1;background:var(--panel2);border:1px solid var(--border2);
+  border-radius:4px;padding:10px 14px;font-family:var(--mono);font-size:.75rem;
+  color:var(--text);outline:none;transition:border-color .2s;
+}
+.search-input:focus{border-color:var(--blue);}
+.search-input::placeholder{color:var(--dim);}
+.search-select{
+  background:var(--panel2);border:1px solid var(--border2);border-radius:4px;
+  padding:10px 14px;font-family:var(--mono);font-size:.72rem;color:var(--text);
+  outline:none;cursor:pointer;
+}
+.btn-search{
+  padding:10px 20px;background:var(--blue);border:none;border-radius:4px;
+  font-family:var(--mono);font-size:.72rem;color:#fff;cursor:pointer;transition:all .2s;white-space:nowrap;
+}
+.btn-search:hover{background:#6aadff;}
+.search-count{font-size:.75rem;color:var(--dim);margin-top:10px;}
+
+/* ── TERMINAL ── */
+.terminal-wrap{margin-bottom:28px;}
+.term-header{
+  background:#0d0d1a;border:1px solid var(--border);border-bottom:none;
+  border-radius:var(--radius) var(--radius) 0 0;
+  padding:9px 16px;display:flex;align-items:center;justify-content:space-between;
+}
+.term-dots{display:flex;gap:5px;}
+.term-dots span{width:9px;height:9px;border-radius:50%;}
+.term-dots span:nth-child(1){background:#ff5f57;}
+.term-dots span:nth-child(2){background:#febc2e;}
+.term-dots span:nth-child(3){background:#28c840;}
+.term-title{font-size:.72rem;color:var(--dim);}
+.term-body{
+  background:#08080f;border:1px solid var(--border);border-radius:0 0 var(--radius) var(--radius);
+  padding:20px 24px;max-height:420px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+}
+.term-body::-webkit-scrollbar{width:3px;}
+.term-body::-webkit-scrollbar-thumb{background:var(--border2);}
+.tl{font-size:.74rem;line-height:1.9;opacity:0;animation:tlIn .25s ease forwards;}
+@keyframes tlIn{from{opacity:0;transform:translateX(-4px)}to{opacity:1;transform:none}}
+.tl.div{color:var(--border2);}
+.tl.hdr{color:var(--orange);font-weight:600;margin-top:6px;}
+.tl.k{color:var(--dim);}
+.tl.k .v{color:var(--text);}
+.tl.k .v.pos{color:var(--green);}
+.tl.k .v.neg{color:var(--red);}
+.tl.k .v.neu{color:var(--yellow);}
+.tl.k .v.warn{color:var(--yellow);}
+.tl.k .v.bad{color:var(--red);}
+.tl.k .v.sev{color:#ff2040;font-weight:600;}
+.tl.ok{color:var(--green);}
+.tl.info{color:var(--dim);}
+.tl.prompt::before{content:'$ ';color:var(--red);}
+
+/* ── CHUNK CARDS ── */
+.chunks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:28px;}
+.chunk-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:16px;transition:border-color .2s;opacity:0;
+  animation:fadeUp .3s ease forwards;
+}
+.chunk-card:hover{border-color:var(--border2);}
+.cc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.cc-num{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);}
+.cc-src{font-size:.72rem;color:var(--purple);margin-top:2px;}
+.sev-badge{font-size:.72rem;font-weight:600;padding:3px 8px;border-radius:3px;}
+.sb0{background:rgba(46,219,133,.1);color:var(--green);border:1px solid rgba(46,219,133,.2);}
+.sb1{background:rgba(245,200,66,.1);color:var(--yellow);border:1px solid rgba(245,200,66,.2);}
+.sb2{background:rgba(255,123,57,.1);color:var(--orange);border:1px solid rgba(255,123,57,.2);}
+.sb3{background:rgba(255,59,92,.12);color:var(--red);border:1px solid rgba(255,59,92,.25);}
+.cc-row{display:flex;justify-content:space-between;font-size:.78rem;padding:4px 0;border-bottom:1px solid var(--border);}
+.cc-row:last-child{border-bottom:none;}
+.ck{color:var(--dim);}
+.cv{color:var(--text);text-align:right;max-width:55%;word-break:break-word;}
+.cv.pos{color:var(--green);}
+.cv.neg{color:var(--red);}
+.cv.neu{color:var(--yellow);}
+.cv.harsh{color:var(--red);}
+.sev-bar-wrap{margin-top:10px;}
+.sev-bar-lbl{display:flex;justify-content:space-between;font-size:.72rem;color:var(--dim);margin-bottom:4px;}
+.sev-bar{height:3px;background:var(--border);border-radius:2px;overflow:hidden;}
+.sev-fill{height:100%;border-radius:2px;transition:width .9s cubic-bezier(.25,.46,.45,.94);}
+.sent-row{display:flex;gap:6px;margin-top:8px;}
+.sent-pill{flex:1;text-align:center;font-size:.72rem;padding:4px 4px;border-radius:3px;font-weight:600;}
+.sp-pos{background:rgba(46,219,133,.08);color:var(--green);border:1px solid rgba(46,219,133,.15);}
+.sp-neg{background:rgba(255,59,92,.08);color:var(--red);border:1px solid rgba(255,59,92,.15);}
+.sp-neu{background:rgba(245,200,66,.06);color:var(--yellow);border:1px solid rgba(245,200,66,.12);}
+
+/* ── SEARCH RESULTS TABLE ── */
+.search-results{margin-top:14px;}
+.sr-table{width:100%;border-collapse:collapse;font-size:.8rem;}
+.sr-table th{text-align:left;padding:8px 10px;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--border);white-space:nowrap;}
+.sr-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+.sr-table tr:hover td{background:rgba(255,255,255,.015);}
+.sr-table tr:last-child td{border-bottom:none;}
+.tag{display:inline-block;padding:2px 7px;border-radius:3px;font-size:.72rem;font-weight:600;}
+.tag.pos{background:rgba(46,219,133,.1);color:var(--green);}
+.tag.neg{background:rgba(255,59,92,.1);color:var(--red);}
+.tag.neu{background:rgba(245,200,66,.08);color:var(--yellow);}
+.tag.harsh{background:rgba(255,59,92,.08);color:var(--red);}
+
+/* ── DOWNLOADS ── */
+.dl-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:36px;}
+.dl-card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  padding:18px 22px;display:flex;align-items:center;gap:16px;
+  cursor:pointer;transition:all .2s;text-decoration:none;
+}
+.dl-card:hover{border-color:var(--red);transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,59,92,.12);}
+.dl-ico{width:42px;height:42px;border:1px solid var(--border2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.dl-info{flex:1;}
+.dl-name{font-family:var(--head);font-weight:700;font-size:.82rem;color:#fff;margin-bottom:3px;}
+.dl-desc{font-size:.72rem;color:var(--dim);}
+.dl-arrow{color:var(--dim);transition:all .2s;}
+.dl-card:hover .dl-arrow{transform:translateX(3px);color:var(--red);}
+
+
+/* ── HERO / PROJECT DESCRIPTION ── */
+.hero-section{
+  position:relative;overflow:hidden;
+  border:1px solid var(--border);border-radius:var(--radius);
+  background:var(--panel);
+  margin-bottom:36px;
+  animation:fadeUp .5s ease both;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 60% 80% at 100% 50%, rgba(255,59,92,.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 0% 80%, rgba(77,159,255,.05) 0%, transparent 55%);
+  pointer-events:none;
+}
+.hero-grid-overlay{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size:40px 40px;
+  opacity:.35;pointer-events:none;
+}
+.hero-inner{
+  position:relative;z-index:1;
+  display:grid;grid-template-columns:1fr 340px;gap:0;
+}
+.hero-left{padding:44px 44px 44px 44px;border-right:1px solid var(--border);}
+.hero-eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--red);margin-bottom:20px;
+}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--red);}
+.hero-eyebrow::after{content:'';width:20px;height:1px;background:var(--red);}
+.hero-title{
+  font-family:var(--head);font-weight:900;
+  font-size:clamp(1.6rem, 3.5vw, 2.6rem);
+  line-height:1.08;letter-spacing:-.03em;
+  color:#fff;margin-bottom:18px;
+}
+.hero-title .hl{color:var(--red);}
+.hero-title .hl2{color:var(--blue);}
+.hero-desc{
+  font-size:.78rem;line-height:1.85;color:#8888aa;
+  max-width:520px;margin-bottom:28px;
+}
+.hero-desc strong{color:var(--text);}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:30px;}
+.htag{
+  font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;
+  padding:5px 12px;border-radius:3px;border:1px solid var(--border2);
+  color:var(--dim);background:var(--panel2);
+  transition:all .2s;
+}
+.htag:hover{border-color:var(--red);color:var(--text);}
+.htag.accent{border-color:rgba(255,59,92,.3);color:var(--red);background:rgba(255,59,92,.06);}
+.hero-version{font-size:.72rem;color:var(--dim);letter-spacing:.1em;}
+.hero-version span{color:var(--green);}
+
+/* right panel — feature list */
+.hero-right{padding:36px 32px;display:flex;flex-direction:column;gap:0;}
+.hero-features-title{
+  font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--dim);margin-bottom:18px;padding-bottom:10px;
+  border-bottom:1px solid var(--border);
+}
+.feature-item{
+  display:flex;gap:14px;padding:13px 0;
+  border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.feature-item:last-child{border-bottom:none;}
+.feat-icon{
+  width:32px;height:32px;flex-shrink:0;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.95rem;margin-top:1px;
+}
+.feat-body{}
+.feat-name{font-size:.72rem;font-weight:600;color:#fff;margin-bottom:3px;font-family:var(--head);}
+.feat-desc{font-size:.72rem;color:var(--dim);line-height:1.5;}
+
+/* pipeline strip */
+.hero-pipeline{
+  position:relative;z-index:1;
+  border-top:1px solid var(--border);
+  display:flex;align-items:stretch;
+  background:var(--panel2);
+  border-radius:0 0 var(--radius) var(--radius);
+  overflow:hidden;
+}
+.pipe-step{
+  flex:1;padding:14px 20px;display:flex;align-items:center;gap:12px;
+  position:relative;font-size:.78rem;
+}
+.pipe-step:not(:last-child)::after{
+  content:'›';position:absolute;right:-4px;top:50%;transform:translateY(-50%);
+  color:var(--dim);font-size:1rem;z-index:1;
+}
+.pipe-step:not(:last-child){border-right:1px solid var(--border);}
+.pipe-num{
+  font-family:var(--head);font-size:.75rem;font-weight:700;
+  width:22px;height:22px;border-radius:3px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+.ps1 .pipe-num{background:rgba(255,59,92,.15);color:var(--red);}
+.ps2 .pipe-num{background:rgba(77,159,255,.12);color:var(--blue);}
+.ps3 .pipe-num{background:rgba(159,111,255,.12);color:var(--purple);}
+.ps4 .pipe-num{background:rgba(46,219,133,.1);color:var(--green);}
+.ps5 .pipe-num{background:rgba(245,200,66,.1);color:var(--yellow);}
+.pipe-text{color:var(--dim);}
+.pipe-text strong{color:var(--text);display:block;margin-bottom:1px;}
+
+@media(max-width:900px){
+  .hero-inner{grid-template-columns:1fr;}
+  .hero-left{border-right:none;border-bottom:1px solid var(--border);}
+  .hero-pipeline{flex-wrap:wrap;}
+  .pipe-step{min-width:45%;}
+}
+
+/* ── MISC ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.no-results{font-size:.72rem;color:var(--dim);padding:20px;text-align:center;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-hex"></div>
+    Harsh<span>Scan</span>
+  </div>
+  <div class="header-r">
+    <span><span class="status-dot"></span>SERVER ONLINE</span>
+    <span id="hFilesCount" style="display:none"></span>
+    <span id="hRecords" style="display:none"></span>
+  </div>
+</header>
+
+<!-- MAIN -->
+<div class="wrap">
+
+
+  <!-- ── PROJECT DESCRIPTION / HERO ── -->
+  <div class="hero-section">
+    <div class="hero-bg"></div>
+    <div class="hero-grid-overlay"></div>
+    <div class="hero-inner">
+
+      <!-- Left: description -->
+      <div class="hero-left">
+        <div class="hero-eyebrow">Content Intelligence System</div>
+        <h1 class="hero-title">
+          Detect. Analyze.<br>
+          <span class="hl">Score</span> &amp; <span class="hl2">Understand</span><br>
+          Your Text Data.
+        </h1>
+        <p class="hero-desc">
+          <strong>HarshScan</strong> is a Python-powered content analysis engine that scans
+          large text datasets for <strong>harmful &amp; harsh language</strong>, computes
+          <strong>sentiment scores</strong> (positive / negative / neutral), and generates
+          detailed chunk-by-chunk reports — all processed in parallel across multiple CPU cores
+          for maximum throughput.
+        </p>
+        <p class="hero-desc" style="margin-bottom:24px">
+          Upload <strong>.txt, .csv, or .xlsx</strong> files (even multiple at once), and get
+          instant visualizations, a searchable results table, severity scoring on a 1–10 scale,
+          and downloadable <strong>CSV + SQLite</strong> reports — no external dependencies beyond
+          Python's standard library and Flask.
+        </p>
+        <div class="hero-tags">
+          <span class="htag accent">Python 3.8+</span>
+          <span class="htag accent">Flask API</span>
+          <span class="htag">Parallel Processing</span>
+          <span class="htag">Sentiment Analysis</span>
+          <span class="htag">Harsh Word Detection</span>
+          <span class="htag">SQLite Storage</span>
+          <span class="htag">CSV Export</span>
+          <span class="htag">Multi-file Support</span>
+          <span class="htag">50K+ Records</span>
+          <span class="htag">ThreadPoolExecutor</span>
+        </div>
+        <div class="hero-version">Version <span>1.0.0</span> &nbsp;·&nbsp; MIT License &nbsp;·&nbsp; Built Feb 2026</div>
+      </div>
+
+      <!-- Right: feature list -->
+      <div class="hero-right">
+        <div class="hero-features-title">Core Capabilities</div>
+
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(255,59,92,.1)">🔍</div>
+          <div class="feat-body">
+            <div class="feat-name">Harsh Word Detection</div>
+            <div class="feat-desc">Scans for 8 categories — murder, rape, suicide, genocide, abuse &amp; more. Counts occurrences per chunk and assigns frequency labels.</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(46,219,133,.08)">💬</div>
+          <div class="feat-body">
+            <div class="feat-name">Smart Sentiment Scoring</div>
+            <div class="feat-desc">Handles modifiers: "not good" → negative, "very good" → amplified positive, repeated words counted correctly.</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(77,159,255,.1)">⚡</div>
+          <div class="feat-body">
+            <div class="feat-name">Parallel Processing</div>
+            <div class="feat-desc">ThreadPoolExecutor with auto CPU-core detection. Serial vs parallel timing comparison shown on every run.</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(159,111,255,.1)">📂</div>
+          <div class="feat-body">
+            <div class="feat-name">Multi-format Upload</div>
+            <div class="feat-desc">Supports .txt, .csv, and .xlsx files. Upload multiple files at once — all processed in a single unified job.</div>
+          </div>
+        </div>
+
+        <div class="feature-item">
+          <div class="feat-icon" style="background:rgba(245,200,66,.08)">📊</div>
+          <div class="feat-body">
+            <div class="feat-name">Dashboard &amp; Charts</div>
+            <div class="feat-desc">Live sentiment donut, pos/neg bar chart, per-chunk severity graph. Search, filter, and export results instantly.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline strip -->
+    <div class="hero-pipeline">
+      <div class="pipe-step ps1">
+        <div class="pipe-num">1</div>
+        <div class="pipe-text"><strong>Upload</strong>TXT / CSV / Excel</div>
+      </div>
+      <div class="pipe-step ps2">
+        <div class="pipe-num">2</div>
+        <div class="pipe-text"><strong>Chunk</strong>Split into 100-line blocks</div>
+      </div>
+      <div class="pipe-step ps3">
+        <div class="pipe-num">3</div>
+        <div class="pipe-text"><strong>Analyze</strong>Harsh words + Sentiment</div>
+      </div>
+      <div class="pipe-step ps4">
+        <div class="pipe-num">4</div>
+        <div class="pipe-text"><strong>Score</strong>Severity 1–10 + Trust level</div>
+      </div>
+      <div class="pipe-step ps5">
+        <div class="pipe-num">5</div>
+        <div class="pipe-text"><strong>Export</strong>CSV + SQLite reports</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── UPLOAD ── -->
+  <div class="slabel">01 / Upload Files</div>
+  <div class="upload-card">
+    <div class="upload-row">
+      <!-- Drop zone -->
+      <div>
+        <div class="drop-zone" id="dropZone">
+          <div class="drop-icon-wrap">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#555570" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+          </div>
+          <div class="drop-title">Drag & drop files here</div>
+          <div class="drop-sub">or <b id="browseBtn">browse from device</b><br/>Supports: <code>.txt</code> &nbsp;<code>.csv</code> &nbsp;<code>.xlsx</code> — multiple files allowed</div>
+          <div class="file-list" id="fileList"></div>
+        </div>
+        <div class="error-box" id="errBox"></div>
+      </div>
+
+      <!-- Right info panel -->
+      <div class="upload-info">
+        <div class="info-box">
+          <div class="info-box-label">Files Selected</div>
+          <div class="info-box-val" id="infoFiles">0</div>
+          <div class="info-box-sub">ready to process</div>
+        </div>
+        <div class="info-box">
+          <div class="info-box-label">Est. Records</div>
+          <div class="info-box-val" id="infoSize">—</div>
+          <div class="info-box-sub">lines across files</div>
+        </div>
+        <button class="btn-analyze" id="analyzeBtn" disabled>
+          <div class="btn-spinner"></div>
+          <span class="btext">Run Analysis</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </button>
+        <button class="btn-reset" id="resetBtn">↺ Reset / Clear All</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD ── -->
+  <div id="dashboard">
+
+    <!-- Summary Stats -->
+    <div class="slabel">02 / Summary</div>
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card"><div class="sc-label">Total Chunks</div><div class="sc-val" id="stChunks">—</div><div class="sc-sub">processed</div></div>
+      <div class="stat-card"><div class="sc-label">Total Words</div><div class="sc-val" id="stWords">—</div><div class="sc-sub">across all files</div></div>
+      <div class="stat-card"><div class="sc-label">Positive</div><div class="sc-val" id="stPos">—</div><div class="sc-sub">word hits</div></div>
+      <div class="stat-card"><div class="sc-label">Negative</div><div class="sc-val" id="stNeg">—</div><div class="sc-sub">word hits</div></div>
+      <div class="stat-card"><div class="sc-label">Flagged</div><div class="sc-val" id="stFlag">—</div><div class="sc-sub">chunks w/ harsh words</div></div>
+      <div class="stat-card"><div class="sc-label">Avg Severity</div><div class="sc-val" id="stSev">—</div><div class="sc-sub">out of 10</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="slabel">03 / Visualizations</div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Sentiment Distribution (Chunks)</div>
+        <div class="chart-wrap"><canvas id="chartSentiment"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Positive vs Negative Word Count</div>
+        <div class="chart-wrap"><canvas id="chartPosNeg"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Severity Score per Chunk</div>
+        <div class="chart-wrap"><canvas id="chartSeverity"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Parallel Timing -->
+    <div class="slabel">04 / Parallel Processing Analysis</div>
+    <div class="timing-card">
+      <div style="font-family:var(--head);font-size:.8rem;font-weight:700;color:#fff;margin-bottom:4px;">Processing Speed Comparison</div>
+      <div style="font-size:.75rem;color:var(--dim);">Serial vs Parallel execution time for this dataset</div>
+      <div class="timing-grid">
+        <div class="timing-item">
+          <div class="ti-label">Serial Time</div>
+          <div class="ti-val" id="tSerial">—</div>
+          <div class="ti-unit">seconds (sample)</div>
+        </div>
+        <div class="timing-item">
+          <div class="ti-label">Parallel Time</div>
+          <div class="ti-val" id="tParallel">—</div>
+          <div class="ti-unit">seconds (full)</div>
+        </div>
+        <div class="timing-item">
+          <div class="ti-label">CPU Cores Used</div>
+          <div class="ti-val" id="tCores">—</div>
+          <div class="ti-unit">workers</div>
+        </div>
+        <div class="timing-item">
+          <div class="ti-label">Speedup Factor</div>
+          <div class="ti-val" id="tSpeedup">—</div>
+          <div class="ti-unit">×  faster</div>
+        </div>
+      </div>
+      <div id="timingBars"></div>
+      <div class="timing-note" id="timingNote"></div>
+    </div>
+
+    <!-- File Stats -->
+    <div class="slabel" id="fileStatsLabel">05 / Files Processed</div>
+    <div class="file-stats-card">
+      <table class="fs-table" id="fileStatsTable">
+        <thead><tr><th>#</th><th>Filename</th><th>Lines</th><th>Chunks</th></tr></thead>
+        <tbody id="fileStatsTbody"></tbody>
+      </table>
+    </div>
+
+    <!-- Terminal -->
+    <div class="slabel">06 / Terminal Output</div>
+    <div class="terminal-wrap">
+      <div class="term-header">
+        <div class="term-dots"><span></span><span></span><span></span></div>
+        <div class="term-title">harshscan — analysis log</div>
+        <div></div>
+      </div>
+      <div class="term-body" id="termBody"></div>
+    </div>
+
+    <!-- Search -->
+    <div class="slabel">07 / Search Records</div>
+    <div class="search-card">
+      <div class="search-row">
+        <input class="search-input" id="searchInput" type="text" placeholder="Search by keyword (e.g. murder, positive, trustable, filename…)"/>
+        <select class="search-select" id="searchSentiment">
+          <option value="">All Sentiments</option>
+          <option value="Positive">Positive</option>
+          <option value="Negative">Negative</option>
+          <option value="Neutral">Neutral</option>
+        </select>
+        <button class="btn-search" id="searchBtn">Search</button>
+        <button class="btn-search" id="showAllBtn" style="background:var(--panel2);border:1px solid var(--border2);color:var(--dim);">Show All</button>
+      </div>
+      <div class="search-count" id="searchCount"></div>
+      <div class="search-results" id="searchResults"></div>
+    </div>
+
+    <!-- Chunk Cards -->
+    <div class="slabel">08 / Chunk Details</div>
+    <div class="chunks-grid" id="chunksGrid"></div>
+
+    <!-- Downloads -->
+    <div class="slabel">09 / Download Reports</div>
+    <div class="dl-grid">
+      <div class="dl-card" id="dlCsv">
+        <div class="dl-ico">📊</div>
+        <div class="dl-info"><div class="dl-name">chunk_results.csv</div><div class="dl-desc">All chunk results with sentiment & harsh word data</div></div>
+        <div class="dl-arrow">→</div>
+      </div>
+      <div class="dl-card" id="dlDb">
+        <div class="dl-ico">🗄️</div>
+        <div class="dl-info"><div class="dl-name">milestone.db</div><div class="dl-desc">SQLite database — query with any DB browser</div></div>
+        <div class="dl-arrow">→</div>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</div><!-- /wrap -->
+
+<input type="file" id="fileInput" accept=".txt,.csv,.xlsx,.xls" multiple/>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let selectedFiles = [];
+let currentJob    = null;
+let chartSent=null, chartPosNeg=null, chartSev=null;
+
+// ── DOM refs ─────────────────────────────────────────────────────────────────
+const dropZone    = document.getElementById('dropZone');
+const fileInput   = document.getElementById('fileInput');
+const browseBtn   = document.getElementById('browseBtn');
+const fileList    = document.getElementById('fileList');
+const analyzeBtn  = document.getElementById('analyzeBtn');
+const resetBtn    = document.getElementById('resetBtn');
+const errBox      = document.getElementById('errBox');
+const dashboard   = document.getElementById('dashboard');
+const termBody    = document.getElementById('termBody');
+const chunksGrid  = document.getElementById('chunksGrid');
+const searchInput = document.getElementById('searchInput');
+const searchSel   = document.getElementById('searchSentiment');
+const searchBtn   = document.getElementById('searchBtn');
+const showAllBtn  = document.getElementById('showAllBtn');
+const searchCount = document.getElementById('searchCount');
+const searchRes   = document.getElementById('searchResults');
+
+const ALLOWED = ['txt','csv','xlsx','xls'];
+
+// ── File Handling ─────────────────────────────────────────────────────────────
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('over');
+  addFiles(Array.from(e.dataTransfer.files));
+});
+dropZone.addEventListener('click', e => {
+  if (e.target.closest('#fileList') || e.target.id === 'browseBtn') return;
+  fileInput.click();
+});
+browseBtn.addEventListener('click', e => { e.stopPropagation(); fileInput.click(); });
+fileInput.addEventListener('change', () => addFiles(Array.from(fileInput.files)));
+
+function ext(name){ return name.split('.').pop().toLowerCase(); }
+function fmtBytes(b){ return b > 1048576 ? (b/1048576).toFixed(1)+'MB' : b > 1024 ? (b/1024).toFixed(0)+'KB' : b+'B'; }
+
+function addFiles(files) {
+  hideErr();
+  const bad = files.filter(f => !ALLOWED.includes(ext(f.name)));
+  if (bad.length) { showErr(`Unsupported: ${bad.map(f=>f.name).join(', ')}. Allowed: .txt .csv .xlsx .xls`); return; }
+  files.forEach(f => {
+    if (!selectedFiles.find(x => x.name === f.name && x.size === f.size)) selectedFiles.push(f);
+  });
+  renderFileList();
+}
+
+function renderFileList() {
+  fileList.innerHTML = '';
+  let totalLines = 0;
+  selectedFiles.forEach((f, i) => {
+    // Rough estimate: 1 line per 60 bytes
+    totalLines += Math.round(f.size / 60);
+    const div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML = `<span style="font-size:.8rem">📄</span><span class="fi-name">${esc(f.name)}</span><span class="fi-size">${fmtBytes(f.size)}</span><button class="fi-remove" data-i="${i}">✕</button>`;
+    fileList.appendChild(div);
+  });
+  fileList.querySelectorAll('.fi-remove').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); selectedFiles.splice(+btn.dataset.i, 1); renderFileList(); });
+  });
+  document.getElementById('infoFiles').textContent = selectedFiles.length;
+  document.getElementById('infoSize').textContent  = totalLines > 0 ? totalLines.toLocaleString() : '—';
+  analyzeBtn.disabled = selectedFiles.length === 0;
+  document.getElementById('hFilesCount').textContent = `${selectedFiles.length} file${selectedFiles.length!==1?'s':''} queued`;
+  document.getElementById('hFilesCount').style.display = selectedFiles.length ? 'inline' : 'none';
+}
+
+// ── Analyse ───────────────────────────────────────────────────────────────────
+analyzeBtn.addEventListener('click', async () => {
+  if (!selectedFiles.length) return;
+  analyzeBtn.classList.add('loading');
+  analyzeBtn.querySelector('.btext').textContent = 'Processing…';
+  analyzeBtn.disabled = true;
+  hideErr();
+
+  const fd = new FormData();
+  selectedFiles.forEach(f => fd.append('files', f));
+
+  try {
+    const res  = await fetch('/api/analyze', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showErr(data.error || 'Analysis failed'); return; }
+    currentJob = data;
+    renderDashboard(data);
+  } catch(e) {
+    showErr('Could not connect to server. Is server.py running on port 5000?');
+  } finally {
+    analyzeBtn.classList.remove('loading');
+    analyzeBtn.querySelector('.btext').textContent = 'Run Analysis';
+    analyzeBtn.disabled = false;
+  }
+});
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+resetBtn.addEventListener('click', async () => {
+  if (currentJob) {
+    await fetch('/api/reset', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({job_id: currentJob.job_id}) });
+  }
+  selectedFiles = [];
+  currentJob = null;
+  renderFileList();
+  dashboard.classList.remove('show');
+  termBody.innerHTML = '';
+  chunksGrid.innerHTML = '';
+  searchRes.innerHTML = '';
+  searchCount.textContent = '';
+  [chartSent, chartPosNeg, chartSev].forEach(c => c && c.destroy());
+  chartSent = chartPosNeg = chartSev = null;
+  document.getElementById('hRecords').style.display = 'none';
+});
+
+// ── Render Dashboard ──────────────────────────────────────────────────────────
+function renderDashboard(data) {
+  const chunks = data.chunks || [];
+  const totalWords = chunks.reduce((s,c) => s + c.word_count, 0);
+  const totalPos   = chunks.reduce((s,c) => s + c.positive_count, 0);
+  const totalNeg   = chunks.reduce((s,c) => s + c.negative_count, 0);
+  const flagged    = chunks.filter(c => c.harsh_words_found !== 'None').length;
+  const avgSev     = chunks.length ? (chunks.reduce((s,c) => s + c.severity_score, 0) / chunks.length).toFixed(1) : 0;
+
+  // Stats bar
+  document.getElementById('stChunks').textContent = data.total_chunks;
+  document.getElementById('stWords').textContent  = totalWords.toLocaleString();
+  document.getElementById('stPos').textContent    = totalPos.toLocaleString();
+  document.getElementById('stNeg').textContent    = totalNeg.toLocaleString();
+  document.getElementById('stFlag').textContent   = flagged;
+  document.getElementById('stSev').textContent    = avgSev;
+
+  document.getElementById('hRecords').textContent = `${totalWords.toLocaleString()} words processed`;
+  document.getElementById('hRecords').style.display = 'inline';
+
+  // Charts
+  buildCharts(chunks);
+
+  // Timing
+  renderTiming(data);
+
+  // File stats
+  renderFileStats(data.file_stats || []);
+
+  // Terminal
+  renderTerminal(data);
+
+  // Chunk cards
+  renderChunkCards(chunks);
+
+  // Downloads
+  document.getElementById('dlCsv').onclick = () => dlFile('csv');
+  document.getElementById('dlDb').onclick  = () => dlFile('db');
+
+  // Trigger search show-all
+  loadSearchResults('', '');
+
+  dashboard.classList.add('show');
+  dashboard.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+function buildCharts(chunks) {
+  const pos = chunks.filter(c => c.final_sentiment === 'Positive').length;
+  const neg = chunks.filter(c => c.final_sentiment === 'Negative').length;
+  const neu = chunks.filter(c => c.final_sentiment === 'Neutral').length;
+
+  if (chartSent) chartSent.destroy();
+  chartSent = new Chart(document.getElementById('chartSentiment'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Positive','Negative','Neutral'],
+      datasets: [{ data: [pos, neg, neu],
+        backgroundColor: ['rgba(46,219,133,.8)','rgba(255,59,92,.8)','rgba(245,200,66,.7)'],
+        borderColor: ['#0e0e18'], borderWidth: 3 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ labels:{ color:'#888', font:{ family:"'IBM Plex Mono'" }, boxWidth:12 }}}
+    }
+  });
+
+  const totalPos = chunks.reduce((s,c) => s+c.positive_count, 0);
+  const totalNeg = chunks.reduce((s,c) => s+c.negative_count, 0);
+  const totalNeu = chunks.reduce((s,c) => s+c.neutral_count, 0);
+
+  if (chartPosNeg) chartPosNeg.destroy();
+  chartPosNeg = new Chart(document.getElementById('chartPosNeg'), {
+    type: 'bar',
+    data: {
+      labels: ['Positive Words','Negative Words','Neutral Words'],
+      datasets:[{ data:[totalPos, totalNeg, totalNeu],
+        backgroundColor:['rgba(46,219,133,.7)','rgba(255,59,92,.7)','rgba(245,200,66,.6)'],
+        borderRadius: 3, borderSkipped: false }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }},
+      scales:{ x:{ ticks:{ color:'#555', font:{ family:"'IBM Plex Mono'", size:10 }}, grid:{ color:'#1c1c2e' }},
+               y:{ ticks:{ color:'#555', font:{ family:"'IBM Plex Mono'", size:10 }}, grid:{ color:'#1c1c2e' }}}}
+  });
+
+  // Severity per chunk (up to 40 chunks for readability)
+  const sample = chunks.slice(0, 40);
+  if (chartSev) chartSev.destroy();
+  chartSev = new Chart(document.getElementById('chartSeverity'), {
+    type: 'bar',
+    data: {
+      labels: sample.map(c => `C${c.chunk}`),
+      datasets:[{ data: sample.map(c => c.severity_score), label:'Severity',
+        backgroundColor: sample.map(c => c.severity_score >= 7 ? 'rgba(255,59,92,.75)' : c.severity_score >= 4 ? 'rgba(255,123,57,.7)' : c.severity_score >= 1 ? 'rgba(245,200,66,.6)' : 'rgba(46,219,133,.5)'),
+        borderRadius: 3, borderSkipped: false }]
+    },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ display:false }},
+      scales:{ x:{ ticks:{ color:'#555', font:{ family:"'IBM Plex Mono'", size:9 }}, grid:{ color:'#1c1c2e' }},
+               y:{ min:0, max:10, ticks:{ color:'#555', font:{ family:"'IBM Plex Mono'", size:10 }}, grid:{ color:'#1c1c2e' }}}}
+  });
+}
+
+// ── Timing ───────────────────────────────────────────────────────────────────
+function renderTiming(data) {
+  const s  = data.serial_time   || 0;
+  const p  = data.parallel_time || 0;
+  const w  = data.num_workers   || 4;
+  const sp = p > 0 ? (s / p).toFixed(2) : '—';
+
+  document.getElementById('tSerial').textContent   = s + 's';
+  document.getElementById('tParallel').textContent = p + 's';
+  document.getElementById('tCores').textContent    = w;
+  document.getElementById('tSpeedup').textContent  = isFinite(sp) ? sp + '×' : '—';
+
+  const max = Math.max(s, p, 0.001);
+  const barsEl = document.getElementById('timingBars');
+  barsEl.innerHTML = `
+    <div class="timing-bar-row">
+      <span class="tlabel">Serial</span>
+      <div class="timing-bar-outer"><div class="timing-bar-fill" style="width:0%;background:var(--orange)" data-w="${(s/max*100).toFixed(1)}%"></div></div>
+      <span style="font-size:.78rem;color:var(--text)">${s}s</span>
+    </div>
+    <div class="timing-bar-row">
+      <span class="tlabel">Parallel</span>
+      <div class="timing-bar-outer"><div class="timing-bar-fill" style="width:0%;background:var(--blue)" data-w="${(p/max*100).toFixed(1)}%"></div></div>
+      <span style="font-size:.78rem;color:var(--text)">${p}s</span>
+    </div>`;
+  requestAnimationFrame(() => setTimeout(() => {
+    barsEl.querySelectorAll('.timing-bar-fill').forEach(el => el.style.width = el.dataset.w);
+  }, 100));
+
+  const note = document.getElementById('timingNote');
+  const chunks = data.total_chunks || 0;
+  if (p <= s) {
+    note.innerHTML = `<strong>⚡ Parallel was faster</strong> — with ${chunks} chunks across ${w} workers, the overhead of thread coordination was outweighed by actual parallel work. Parallel processing excels at datasets with <strong>many large chunks</strong> where CPU work dominates.`;
+  } else {
+    note.innerHTML = `<strong>Why is serial faster here?</strong> For small datasets (${chunks} chunk${chunks>1?'s':''}), Python's GIL and thread-spawning overhead (~ms) exceed the actual computation time. <strong>Parallel becomes faster when chunks ≥ 50 and each chunk is large</strong> (e.g. 50K+ line files). On I/O-heavy tasks (file reads, API calls), parallel always wins.`;
+  }
+}
+
+// ── File Stats ────────────────────────────────────────────────────────────────
+function renderFileStats(stats) {
+  const tbody = document.getElementById('fileStatsTbody');
+  tbody.innerHTML = '';
+  (stats || []).forEach((f, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:var(--dim)">${i+1}</td><td style="color:var(--blue)">${esc(f.filename)}</td><td>${(f.line_count||0).toLocaleString()}</td><td>${f.chunk_count||0}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// ── Terminal ──────────────────────────────────────────────────────────────────
+function renderTerminal(data) {
+  termBody.innerHTML = '';
+  const lines = [];
+  const add = (html, cls='') => lines.push({html, cls});
+
+  add(`Processing: ${esc(data.input_file || data.input_files?.join(', ') || 'files')}`, 'prompt');
+  add(`Total chunks: ${data.total_chunks}  |  Workers: ${data.num_workers}`, 'info');
+  add(`Serial (sample): ${data.serial_time}s  |  Parallel (full): ${data.parallel_time}s`, 'info');
+  add('─'.repeat(56), 'div');
+
+  (data.chunks || []).forEach(c => {
+    add(`Chunk ${c.chunk}  [${esc(c.source_file)}]`, 'hdr');
+    add(`  Words: <span class="v">${c.word_count}</span>  Errors: <span class="v ${c.error_count>5?'bad':c.error_count>0?'warn':''}">${c.error_count}</span>  Trust: <span class="v ${c.trust_level==='Trustable'?'pos':c.trust_level.includes('Moderately')?'warn':'neg'}">${c.trust_level}</span>`, 'k');
+    add(`  Sentiment: <span class="v ${sentCls(c.final_sentiment)}">${c.final_sentiment}</span>  pos=${c.positive_count}  neg=${c.negative_count}  neu=${c.neutral_count}`, 'k');
+    add(`  Harsh: <span class="v ${c.harsh_words_found!=='None'?'bad':''}">${c.harsh_words_found}</span>  Freq: ${c.frequency_label}  Severity: <span class="v ${sevCls(c.severity_score)}">${c.severity_score}/10</span>`, 'k');
+    add('─'.repeat(56), 'div');
+  });
+
+  add('Processing completed ✓', 'ok');
+  add(`CSV: chunk_results.csv  |  DB: milestone.db  |  Time: ${data.execution_time}s`, 'info');
+
+  lines.forEach((l, i) => {
+    const el = document.createElement('div');
+    el.className = 'tl ' + (l.cls||'');
+    el.innerHTML = l.html;
+    el.style.animationDelay = `${i*20}ms`;
+    termBody.appendChild(el);
+  });
+}
+
+// ── Chunk Cards ───────────────────────────────────────────────────────────────
+function renderChunkCards(chunks) {
+  chunksGrid.innerHTML = '';
+  chunks.forEach((c, i) => {
+    const card = document.createElement('div');
+    card.className = 'chunk-card';
+    card.style.animationDelay = `${i*40}ms`;
+    const pct = (c.severity_score / 10 * 100).toFixed(0);
+    const sevColor = c.severity_score>=7?'var(--red)':c.severity_score>=4?'var(--orange)':c.severity_score>=1?'var(--yellow)':'var(--green)';
+    card.innerHTML = `
+      <div class="cc-head">
+        <div><div class="cc-num">Chunk #${c.chunk}</div><div class="cc-src">${esc(c.source_file)}</div></div>
+        <div class="sev-badge ${sevBadgeCls(c.severity_score)}">SEV ${c.severity_score}/10</div>
+      </div>
+      <div class="cc-row"><span class="ck">Word Count</span><span class="cv">${c.word_count.toLocaleString()}</span></div>
+      <div class="cc-row"><span class="ck">Error Count</span><span class="cv ${c.error_count>5?'neg':c.error_count>0?'neu':''}">${c.error_count}</span></div>
+      <div class="cc-row"><span class="ck">Trust Level</span><span class="cv ${c.trust_level==='Trustable'?'pos':c.trust_level.includes('Mod')?'neu':'neg'}">${c.trust_level}</span></div>
+      <div class="cc-row"><span class="ck">Frequency</span><span class="cv">${c.frequency_label}</span></div>
+      <div class="cc-row"><span class="ck">Harsh Words</span><span class="cv ${c.harsh_words_found!=='None'?'harsh':''}">${c.harsh_words_found}</span></div>
+      <div class="cc-row"><span class="ck">Final Sentiment</span><span class="cv ${sentCls(c.final_sentiment)}">${c.final_sentiment}</span></div>
+      <div class="sent-row">
+        <div class="sent-pill sp-pos">▲ ${c.positive_count} pos</div>
+        <div class="sent-pill sp-neg">▼ ${c.negative_count} neg</div>
+        <div class="sent-pill sp-neu">◆ ${c.neutral_count} neu</div>
+      </div>
+      <div class="sev-bar-wrap">
+        <div class="sev-bar-lbl"><span>Severity</span><span>${pct}%</span></div>
+        <div class="sev-bar"><div class="sev-fill" style="width:0%;background:${sevColor}" data-w="${pct}%"></div></div>
+      </div>`;
+    chunksGrid.appendChild(card);
+    requestAnimationFrame(() => setTimeout(() => {
+      const f = card.querySelector('.sev-fill');
+      if (f) f.style.width = f.dataset.w;
+    }, 200 + i*30));
+  });
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+searchBtn.addEventListener('click', () => {
+  const kw = searchInput.value.trim();
+  const st = searchSel.value;
+  loadSearchResults(kw, st);
+});
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchBtn.click(); });
+showAllBtn.addEventListener('click', () => { searchInput.value=''; searchSel.value=''; loadSearchResults('',''); });
+
+async function loadSearchResults(keyword, sentiment) {
+  if (!currentJob) return;
+  const params = new URLSearchParams();
+  if (keyword)   params.set('keyword', keyword);
+  if (sentiment) params.set('sentiment', sentiment);
+  try {
+    const res  = await fetch(`/api/search/${currentJob.job_id}?${params}`);
+    const data = await res.json();
+    if (!res.ok) { searchCount.textContent = 'Search error'; return; }
+    searchCount.textContent = `${data.count} result${data.count!==1?'s':''} found`;
+    renderSearchResults(data.results);
+  } catch(e) {
+    searchCount.textContent = 'Search failed — server not reachable';
+  }
+}
+
+function renderSearchResults(rows) {
+  if (!rows || rows.length === 0) {
+    searchRes.innerHTML = '<div class="no-results">No matching records. Try a different keyword.</div>';
+    return;
+  }
+  const cols = ['chunk_number','source_file','word_count','final_sentiment','positive_count','negative_count','frequency_label','severity_score','harsh_words_found'];
+  const labels = ['Chunk','Source','Words','Sentiment','Pos','Neg','Frequency','Sev','Harsh Words'];
+  let html = `<table class="sr-table"><thead><tr>${labels.map(l=>`<th>${l}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r => {
+    const sentClass = r.final_sentiment === 'Positive' ? 'pos' : r.final_sentiment === 'Negative' ? 'neg' : 'neu';
+    html += `<tr>
+      <td>${r.chunk_number}</td>
+      <td style="color:var(--purple)">${esc(r.source_file||'')}</td>
+      <td>${(r.word_count||0).toLocaleString()}</td>
+      <td><span class="tag ${sentClass}">${r.final_sentiment}</span></td>
+      <td style="color:var(--green)">${r.positive_count||0}</td>
+      <td style="color:var(--red)">${r.negative_count||0}</td>
+      <td>${r.frequency_label||''}</td>
+      <td>${r.severity_score||0}</td>
+      <td style="color:${r.harsh_words_found!=='None'?'var(--red)':'var(--dim)'}">${esc(r.harsh_words_found||'None')}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  searchRes.innerHTML = html;
+}
+
+// ── Downloads ─────────────────────────────────────────────────────────────────
+function dlFile(type) {
+  if (!currentJob) return;
+  const a = document.createElement('a');
+  a.href = `/api/download/${currentJob.job_id}/${type}`;
+  a.download = type === 'csv' ? 'chunk_results.csv' : 'milestone.db';
+  a.click();
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function sentCls(s){ return s==='Positive'?'pos':s==='Negative'?'neg':'neu'; }
+function sevCls(n){ return n>=7?'sev':n>=4?'bad':n>=1?'warn':''; }
+function sevBadgeCls(n){ return n===0?'sb0':n<=3?'sb1':n<=6?'sb2':'sb3'; }
+function showErr(msg){ errBox.textContent=msg; errBox.classList.add('show'); }
+function hideErr(){ errBox.classList.remove('show'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+</body>
+</html>
